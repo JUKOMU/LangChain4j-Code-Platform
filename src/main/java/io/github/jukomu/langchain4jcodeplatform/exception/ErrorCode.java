@@ -4,7 +4,7 @@ import lombok.Getter;
 
 /**
  * @author JUKOMU
- * @Description:
+ * @Description: 错误码枚举
  * @Project: LangChain4j-Code-Platform
  * @Date: 2026/3/15
  */

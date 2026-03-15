@@ -6,7 +6,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * @author JUKOMU
- * @Description:
+ * @Description: 跨域配置
  * @Project: LangChain4j-Code-Platform
  * @Date: 2026/3/15
  */

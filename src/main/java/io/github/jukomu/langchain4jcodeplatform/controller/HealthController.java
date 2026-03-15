@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * @author JUKOMU
- * @Description:
+ * @Description: 接口测试
  * @Project: LangChain4j-Code-Platform
  * @Date: 2026/3/15
  */
