@@ -30,7 +30,9 @@ public class ThrowUtils {
      * @param errorCode 错误码
      */
     public static void throwIf(boolean condition, ErrorCode errorCode) {
-        throwIf(condition, new BusinessException(errorCode));
+        if (condition) {
+            throw new BusinessException(errorCode);
+        }
     }
 
     /**
@@ -41,6 +43,8 @@ public class ThrowUtils {
      * @param message   错误信息
      */
     public static void throwIf(boolean condition, ErrorCode errorCode, String message) {
-        throwIf(condition, new BusinessException(errorCode, message));
+        if (condition) {
+            throw new BusinessException(errorCode, message);
+        }
     }
 }

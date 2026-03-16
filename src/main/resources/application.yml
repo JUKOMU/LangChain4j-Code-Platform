@@ -1,4 +1,10 @@
 spring:
+  # mysql
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/ai_code_platform
+    username: root
+    password: 123456789
   application:
     name: LangChain4j-Code-Platform
 
