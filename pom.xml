@@ -16,9 +16,10 @@
     <url/>
     <licenses>
         <license>
-            <name>MIT License</name>
-            <url>https://opensource.org/licenses/MIT</url>
+            <name>GNU General Public License v3.0 or later</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.txt</url>
             <distribution>repo</distribution>
+            <comments>GPL-3.0-or-later</comments>
         </license>
     </licenses>
     <developers>
