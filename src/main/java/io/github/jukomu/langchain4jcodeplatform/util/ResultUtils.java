@@ -19,7 +19,7 @@ public class ResultUtils {
      * @return 成功响应
      */
     public static <T> BaseResponse<T> success(T data) {
-        return new BaseResponse<>(0, data, "ok");
+        return new BaseResponse<>(200, data, "ok");
     }
 
     /**

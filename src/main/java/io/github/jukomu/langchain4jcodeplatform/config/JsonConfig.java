@@ -8,7 +8,7 @@ import tools.jackson.databind.ser.std.ToStringSerializer;
 
 /**
  * @author JUKOMU
- * @Description:
+ * @Description: JSON配置，long转字符串
  * @Project: LangChain4j-Code-Platform
  * @Date: 2026/3/16
  */
