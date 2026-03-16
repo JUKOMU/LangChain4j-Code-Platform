@@ -28,4 +28,4 @@ const checkAccess = (loginUser: API.LoginUserVo, needAccess = ACCESS_ENUM.NOT_LO
   return true
 }
 
-export default checkAccess;
+export default checkAccess

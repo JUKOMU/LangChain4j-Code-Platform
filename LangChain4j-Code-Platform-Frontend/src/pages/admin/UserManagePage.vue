@@ -122,7 +122,11 @@ onMounted(() => {
         <a-input v-model:value="searchParams.userName" placeholder="输入用户名" />
       </a-form-item>
       <a-form-item label="角色">
-        <a-select v-model:value="searchParams.userRole" placeholder="选择角色" dropdown-match-select-width>
+        <a-select
+          v-model:value="searchParams.userRole"
+          placeholder="选择角色"
+          dropdown-match-select-width
+        >
           <a-select-option>无</a-select-option>
           <a-select-option value="user">用户</a-select-option>
           <a-select-option value="admin">管理员</a-select-option>

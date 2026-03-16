@@ -28,7 +28,7 @@ const router = createRouter({
       name: '用户管理',
       component: UserManagePage,
       meta: {
-        access: ACCESS_ENUM.ADMIN
+        access: ACCESS_ENUM.ADMIN,
       },
     },
   ],

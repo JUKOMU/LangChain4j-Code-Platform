@@ -42,7 +42,7 @@ export async function deleteUser(body: API.DeleteRequest, options?: { [key: stri
 export async function getUser(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
   params: API.getUserParams,
-  options?: { [key: string]: any }
+  options?: { [key: string]: any },
 ) {
   const { id: param0, ...queryParams } = params
   return request<API.BaseResponseUserVo>(`/user/${param0}`, {

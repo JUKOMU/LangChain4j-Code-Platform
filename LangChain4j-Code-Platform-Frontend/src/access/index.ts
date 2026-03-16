@@ -1,5 +1,4 @@
 import { useLoginUserStore } from '@/stores/loginUser.ts'
-import { message } from 'ant-design-vue'
 import router from '@/router'
 import ACCESS_ENUM from '@/access/accessEnum.ts'
 import checkAccess from '@/access/checkAccess.ts'
