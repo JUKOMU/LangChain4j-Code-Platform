@@ -1,0 +1,9 @@
+# AI
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: https://domain
+      api-key: <Your API Key>
+      model-name: model-name
+      log-requests: true
+      log-responses: true
