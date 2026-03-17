@@ -1,10 +1,10 @@
 package io.github.jukomu.langchain4jcodeplatform.config;
 
-import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import tools.jackson.databind.module.SimpleModule;
-import tools.jackson.databind.ser.std.ToStringSerializer;
 
 /**
  * @author JUKOMU
@@ -16,12 +16,12 @@ import tools.jackson.databind.ser.std.ToStringSerializer;
 public class JsonConfig {
 
     @Bean
-    public JsonMapperBuilderCustomizer longToStringCustomizer() {
+    public Jackson2ObjectMapperBuilderCustomizer longToStringCustomizer() {
         return builder -> {
             SimpleModule module = new SimpleModule();
             module.addSerializer(Long.class, ToStringSerializer.instance);
             module.addSerializer(Long.TYPE, ToStringSerializer.instance);
-            builder.addModule(module);
+            builder.modules(module);
         };
     }
 }
