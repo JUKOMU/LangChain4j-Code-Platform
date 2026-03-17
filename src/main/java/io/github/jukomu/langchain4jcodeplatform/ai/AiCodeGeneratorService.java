@@ -1,6 +1,8 @@
 package io.github.jukomu.langchain4jcodeplatform.ai;
 
 import dev.langchain4j.service.SystemMessage;
+import io.github.jukomu.langchain4jcodeplatform.ai.model.HtmlCodeResult;
+import io.github.jukomu.langchain4jcodeplatform.ai.model.MultiFileCodeResult;
 
 /**
  * @author JUKOMU
@@ -12,9 +14,21 @@ public interface AiCodeGeneratorService {
 
     String generateCode(String userMessage);
 
+    /**
+     * 生成HTML代码
+     *
+     * @param userMessage
+     * @return
+     */
     @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
-    String generateHtmlCode(String userMessage);
+    HtmlCodeResult generateHtmlCode(String userMessage);
 
+    /**
+     * 生成多文件代码
+     *
+     * @param userMessage
+     * @return
+     */
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
-    String generateHtmlMultiFileCode(String userMessage);
+    MultiFileCodeResult generateHtmlMultiFileCode(String userMessage);
 }
