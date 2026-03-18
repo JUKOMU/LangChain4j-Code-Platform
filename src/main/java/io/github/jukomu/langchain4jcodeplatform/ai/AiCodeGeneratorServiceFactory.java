@@ -20,6 +20,8 @@ public class AiCodeGeneratorServiceFactory {
 
     @Bean
     public AiCodeGeneratorService aiCodeGeneratorService() {
-        return AiServices.create(AiCodeGeneratorService.class, chatModel);
+        return AiServices.builder(AiCodeGeneratorService.class)
+                .chatModel(chatModel)
+                .build();
     }
 }
