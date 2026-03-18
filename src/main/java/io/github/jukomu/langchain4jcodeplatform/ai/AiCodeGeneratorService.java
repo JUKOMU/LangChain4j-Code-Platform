@@ -3,6 +3,7 @@ package io.github.jukomu.langchain4jcodeplatform.ai;
 import dev.langchain4j.service.SystemMessage;
 import io.github.jukomu.langchain4jcodeplatform.ai.model.HtmlCodeResult;
 import io.github.jukomu.langchain4jcodeplatform.ai.model.MultiFileCodeResult;
+import reactor.core.publisher.Flux;
 
 /**
  * @author JUKOMU
@@ -31,4 +32,22 @@ public interface AiCodeGeneratorService {
      */
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
     MultiFileCodeResult generateHtmlMultiFileCode(String userMessage);
+
+    /**
+     * 生成HTML代码 (流式)
+     *
+     * @param userMessage
+     * @return
+     */
+    @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
+    Flux<String> streamGenerateHtmlCode(String userMessage);
+
+    /**
+     * 生成多文件代码 (流式)
+     *
+     * @param userMessage
+     * @return
+     */
+    @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
+    Flux<String> streamGenerateHtmlMultiFileCode(String userMessage);
 }

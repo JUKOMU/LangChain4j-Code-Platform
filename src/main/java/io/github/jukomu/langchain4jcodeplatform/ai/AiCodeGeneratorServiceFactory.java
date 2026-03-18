@@ -1,6 +1,7 @@
 package io.github.jukomu.langchain4jcodeplatform.ai;
 
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -18,10 +19,13 @@ public class AiCodeGeneratorServiceFactory {
 
     private final ChatModel chatModel;
 
+    private final StreamingChatModel streamingChatModel;
+
     @Bean
     public AiCodeGeneratorService aiCodeGeneratorService() {
         return AiServices.builder(AiCodeGeneratorService.class)
                 .chatModel(chatModel)
+                .streamingChatModel(streamingChatModel)
                 .build();
     }
 }
