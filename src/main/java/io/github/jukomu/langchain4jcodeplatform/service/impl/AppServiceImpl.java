@@ -1,0 +1,304 @@
+package io.github.jukomu.langchain4jcodeplatform.service.impl;
+
+import cn.hutool.core.util.StrUtil;
+import com.mybatisflex.core.paginate.Page;
+import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.spring.service.impl.ServiceImpl;
+import io.github.jukomu.langchain4jcodeplatform.common.DeleteRequest;
+import io.github.jukomu.langchain4jcodeplatform.exception.BusinessException;
+import io.github.jukomu.langchain4jcodeplatform.exception.ErrorCode;
+import io.github.jukomu.langchain4jcodeplatform.mapper.AppMapper;
+import io.github.jukomu.langchain4jcodeplatform.model.dto.app.*;
+import io.github.jukomu.langchain4jcodeplatform.model.entity.App;
+import io.github.jukomu.langchain4jcodeplatform.model.entity.User;
+import io.github.jukomu.langchain4jcodeplatform.model.enums.CodeGenTypeEnum;
+import io.github.jukomu.langchain4jcodeplatform.model.vo.AppVo;
+import io.github.jukomu.langchain4jcodeplatform.model.vo.UserVo;
+import io.github.jukomu.langchain4jcodeplatform.service.AppService;
+import io.github.jukomu.langchain4jcodeplatform.service.UserService;
+import io.github.jukomu.langchain4jcodeplatform.util.ThrowUtils;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.beans.BeanUtils;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static io.github.jukomu.langchain4jcodeplatform.constant.AppConstant.DEFAULT_APP_PRIORITY;
+import static io.github.jukomu.langchain4jcodeplatform.constant.AppConstant.FEATURED_APP_PRIORITY;
+
+/**
+ * 搴旂敤 鏈嶅姟灞傚疄鐜般€? *
+ *
+ * @author JUKOMU
+ */
+@Service
+public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
+
+    private static final int USER_MAX_PAGE_SIZE = 20;
+    private final UserService userService;
+
+    public AppServiceImpl(UserService userService) {
+        this.userService = userService;
+    }
+
+    @Override
+    public long addApp(AppAddDto appAddDto, Long userId) {
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
+        validateAppAddDto(appAddDto);
+        if (appAddDto.getCodeGenType() == null || CodeGenTypeEnum.getEnumByValue(appAddDto.getCodeGenType()) == null) {
+            // 设置默认为多文件生成
+            appAddDto.setCodeGenType(CodeGenTypeEnum.MULTI_FILE.getValue());
+        }
+        App app = new App();
+        BeanUtils.copyProperties(appAddDto, app);
+        if (StrUtil.isBlank(app.getAppName())) {
+            app.setAppName("未命名应用");
+        }
+        app.setUserId(userId);
+        app.setPriority(DEFAULT_APP_PRIORITY);
+        boolean saved = this.save(app);
+        ThrowUtils.throwIf(!saved, ErrorCode.OPERATION_ERROR);
+        return app.getId();
+    }
+
+    @Override
+    public boolean updateMyApp(AppUpdateDto appUpdateDto, Long userId) {
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
+        validateAppUpdateDto(appUpdateDto);
+        // 判断app是否存在
+        App oldApp = this.getById(appUpdateDto.getId());
+        ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
+        // 仅本人可更新
+        checkAppOwner(oldApp, userId);
+        App app = new App();
+        app.setId(appUpdateDto.getId());
+        app.setAppName(appUpdateDto.getAppName());
+        // 设置编辑时间区分updateTime
+        app.setEditTime(LocalDateTime.now());
+        boolean updated = this.updateById(app);
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR);
+        return true;
+    }
+
+    @Override
+    public boolean deleteMyApp(DeleteRequest deleteRequest, Long userId) {
+        ThrowUtils.throwIf(deleteRequest == null || deleteRequest.getId() == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
+        // 判断app是否存在
+        App oldApp = this.getById(deleteRequest.getId());
+        ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
+        // 仅本人可删除
+        checkAppOwner(oldApp, userId);
+        boolean removed = this.removeById(deleteRequest.getId());
+        ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR);
+        return true;
+    }
+
+    @Override
+    public @NotNull AppVo getApp(long id, Long userId) {
+        ThrowUtils.throwIf(id <= 0 || userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
+        App app = this.getById(id);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
+        // 用户只能查看自己的并且优先级正常的应用
+        if (!userId.equals(app.getUserId()) && (app.getPriority() == null || app.getPriority() < DEFAULT_APP_PRIORITY)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限查看该应用");
+        }
+        // 组装用户信息
+        AppVo appVo = getAppVo(app);
+        UserVo userVo = userService.getUser(userId);
+        appVo.setUser(userVo);
+        return appVo;
+    }
+
+    @Override
+    public Page<AppVo> getMyApps(AppQueryDto appQueryDto, Long userId) {
+        ThrowUtils.throwIf(appQueryDto == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
+        int pageNum = appQueryDto.getPageNum();
+        int pageSize = appQueryDto.getPageSize();
+        validateUserPage(pageNum, pageSize);
+        // 用户只能查询自己的应用
+        appQueryDto.setUserId(userId);
+        QueryWrapper queryWrapper = getQueryWrapper(appQueryDto);
+        Page<App> appPage = this.page(Page.of(pageNum, pageSize), queryWrapper);
+        return buildAppVoPage(appPage, pageNum, pageSize);
+    }
+
+    @Override
+    public Page<AppVo> getFeaturedApps(AppQueryDto appQueryDto) {
+        ThrowUtils.throwIf(appQueryDto == null, ErrorCode.PARAMS_ERROR);
+        int pageNum = appQueryDto.getPageNum();
+        int pageSize = appQueryDto.getPageSize();
+        validateUserPage(pageNum, pageSize);
+        QueryWrapper queryWrapper = QueryWrapper.create()
+                .like(App::getAppName, appQueryDto.getAppName())
+                .gt(App::getPriority, FEATURED_APP_PRIORITY)
+                .orderBy(App::getPriority, false)
+                .orderBy(App::getUpdateTime, false);
+        Page<App> appPage = this.page(Page.of(pageNum, pageSize), queryWrapper);
+        return buildAppVoPage(appPage, pageNum, pageSize);
+    }
+
+    @Override
+    public boolean deleteApp(DeleteRequest deleteRequest) {
+        ThrowUtils.throwIf(deleteRequest == null || deleteRequest.getId() == null, ErrorCode.PARAMS_ERROR);
+        App oldApp = this.getById(deleteRequest.getId());
+        ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
+        boolean removed = this.removeById(deleteRequest.getId());
+        ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR);
+        return true;
+    }
+
+    @Override
+    public boolean updateApp(AppAdminUpdateDto appAdminUpdateDto) {
+        ThrowUtils.throwIf(appAdminUpdateDto == null || appAdminUpdateDto.getId() == null, ErrorCode.PARAMS_ERROR);
+        validateAppAdminUpdateDto(appAdminUpdateDto);
+        App oldApp = this.getById(appAdminUpdateDto.getId());
+        ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
+        App app = new App();
+        BeanUtils.copyProperties(appAdminUpdateDto, app);
+        app.setEditTime(LocalDateTime.now());
+        boolean updated = this.updateById(app);
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR);
+        return true;
+    }
+
+    @Override
+    public AppVo getApp(long id) {
+        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
+        App app = this.getById(id);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
+        // 组转用户信息
+        AppVo appVo = getAppVo(app);
+        UserVo userVo = userService.getUser(app.getUserId());
+        appVo.setUser(userVo);
+        return appVo;
+    }
+
+    @Override
+    public Page<AppVo> getApps(AppAdminQueryDto appAdminQueryDto) {
+        ThrowUtils.throwIf(appAdminQueryDto == null, ErrorCode.PARAMS_ERROR);
+        int pageNum = appAdminQueryDto.getPageNum();
+        int pageSize = appAdminQueryDto.getPageSize();
+        ThrowUtils.throwIf(pageNum <= 0 || pageSize <= 0, ErrorCode.PARAMS_ERROR, "分页参数错误");
+        Page<App> appPage = this.page(Page.of(pageNum, pageSize), getAdminQueryWrapper(appAdminQueryDto));
+        return buildAppVoPage(appPage, pageNum, pageSize);
+    }
+
+    private void validateAppAddDto(AppAddDto appAddDto) {
+        ThrowUtils.throwIf(StrUtil.isBlank(appAddDto.getInitPrompt()), ErrorCode.PARAMS_ERROR, "initPrompt 不能为空");
+        ThrowUtils.throwIf(appAddDto.getAppName() != null && appAddDto.getAppName().length() > 256, ErrorCode.PARAMS_ERROR, "应用名称过长");
+        ThrowUtils.throwIf(appAddDto.getCover() != null && appAddDto.getCover().length() > 512, ErrorCode.PARAMS_ERROR, "应用封面过长");
+        ThrowUtils.throwIf(appAddDto.getCodeGenType() != null && appAddDto.getCodeGenType().length() > 64, ErrorCode.PARAMS_ERROR, "代码生成类型过长");
+    }
+
+    private void validateAppUpdateDto(AppUpdateDto appUpdateDto) {
+        ThrowUtils.throwIf(StrUtil.isBlank(appUpdateDto.getAppName()), ErrorCode.PARAMS_ERROR, "应用名称不能为空");
+        ThrowUtils.throwIf(appUpdateDto.getAppName().length() > 256, ErrorCode.PARAMS_ERROR, "应用名称过长");
+    }
+
+    private void validateAppAdminUpdateDto(AppAdminUpdateDto appAdminUpdateDto) {
+        ThrowUtils.throwIf(appAdminUpdateDto.getAppName() != null && appAdminUpdateDto.getAppName().length() > 256, ErrorCode.PARAMS_ERROR, "应用名称过长");
+        ThrowUtils.throwIf(appAdminUpdateDto.getCover() != null && appAdminUpdateDto.getCover().length() > 512, ErrorCode.PARAMS_ERROR, "应用封面过长");
+    }
+
+    private void validateUserPage(int pageNum, int pageSize) {
+        ThrowUtils.throwIf(pageNum <= 0 || pageSize <= 0, ErrorCode.PARAMS_ERROR, "分页参数错误");
+        ThrowUtils.throwIf(pageSize > USER_MAX_PAGE_SIZE, ErrorCode.PARAMS_ERROR, "每页最多查询 20 条");
+    }
+
+    private void checkAppOwner(App app, Long userId) {
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(!userId.equals(app.getUserId()), ErrorCode.NO_AUTH_ERROR, "只能操作自己的应用");
+    }
+
+    private QueryWrapper getQueryWrapper(AppQueryDto appQueryDto) {
+        if (appQueryDto == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+        String sortField = appQueryDto.getSortField();
+        String sortOrder = appQueryDto.getSortOrder();
+        QueryWrapper queryWrapper = QueryWrapper.create()
+                .eq(App::getId, appQueryDto.getId())
+                .like(App::getAppName, appQueryDto.getAppName())
+                .like(App::getCover, appQueryDto.getCover())
+                .like(App::getInitPrompt, appQueryDto.getInitPrompt())
+                .eq(App::getCodeGenType, appQueryDto.getCodeGenType())
+                .eq(App::getDeployKey, appQueryDto.getDeployKey())
+                .eq(App::getPriority, appQueryDto.getPriority())
+                .eq(App::getUserId, appQueryDto.getUserId());
+        if (StrUtil.isNotBlank(sortField)) {
+            queryWrapper.orderBy(sortField, "ascend".equals(sortOrder));
+        } else {
+            queryWrapper.orderBy(App::getUpdateTime, false);
+        }
+        return queryWrapper;
+    }
+
+    private QueryWrapper getAdminQueryWrapper(AppAdminQueryDto appAdminQueryDto) {
+        if (appAdminQueryDto == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+        String sortField = appAdminQueryDto.getSortField();
+        String sortOrder = appAdminQueryDto.getSortOrder();
+        QueryWrapper queryWrapper = QueryWrapper.create()
+                .eq(App::getId, appAdminQueryDto.getId())
+                .like(App::getAppName, appAdminQueryDto.getAppName())
+                .like(App::getCover, appAdminQueryDto.getCover())
+                .like(App::getInitPrompt, appAdminQueryDto.getInitPrompt())
+                .eq(App::getCodeGenType, appAdminQueryDto.getCodeGenType())
+                .eq(App::getDeployKey, appAdminQueryDto.getDeployKey())
+                .eq(App::getPriority, appAdminQueryDto.getPriority())
+                .eq(App::getUserId, appAdminQueryDto.getUserId());
+        if (StrUtil.isNotBlank(sortField)) {
+            queryWrapper.orderBy(sortField, "ascend".equals(sortOrder));
+        } else {
+            queryWrapper.orderBy(App::getUpdateTime, false);
+        }
+        return queryWrapper;
+    }
+
+    private Page<AppVo> buildAppVoPage(Page<App> appPage, int pageNum, int pageSize) {
+        Page<AppVo> appVoPage = new Page<>(pageNum, pageSize, appPage.getTotalRow());
+        Map<Long, UserVo> userMap = getUserMap(appPage.getRecords());
+        // 组装app列表和用户信息
+        List<AppVo> appVoList = appPage.getRecords().stream()
+                .map(app -> {
+                    AppVo appVo = getAppVo(app);
+                    UserVo userVo = userMap.get(app.getUserId());
+                    appVo.setUser(userVo);
+                    return appVo;
+                }).toList();
+        appVoPage.setRecords(appVoList);
+        return appVoPage;
+    }
+
+    private AppVo getAppVo(App app) {
+        AppVo appVo = new AppVo();
+        BeanUtils.copyProperties(app, appVo);
+        return appVo;
+    }
+
+    /**
+     * 批量获取用户列表
+     *
+     * @return
+     */
+    private Map<Long, UserVo> getUserMap(Collection<App> apps) {
+        Set<Long> userIds = apps.stream()
+                .map(App::getUserId)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, UserVo> userMap = userService.listByIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, item -> {
+                    UserVo userVo = new UserVo();
+                    BeanUtils.copyProperties(item, UserVo.class);
+                    return userVo;
+                }));
+        return userMap;
+    }
+}

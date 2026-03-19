@@ -8,6 +8,7 @@ import io.github.jukomu.langchain4jcodeplatform.model.entity.User;
 import io.github.jukomu.langchain4jcodeplatform.model.vo.LoginUserVo;
 import io.github.jukomu.langchain4jcodeplatform.model.vo.UserVo;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 用户 服务层。
@@ -39,6 +40,7 @@ public interface UserService extends IService<User> {
      * @param request
      * @return
      */
+    @NotNull
     LoginUserVo getLoginUser(HttpServletRequest request);
 
     /**
@@ -55,6 +57,7 @@ public interface UserService extends IService<User> {
      * @param id
      * @return
      */
+    @NotNull
     UserVo getUser(long id);
 
     /**

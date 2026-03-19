@@ -8,7 +8,7 @@ import java.io.Serializable;
 
 /**
  * @author JUKOMU
- * @Description:
+ * @Description: 用户查询数据传输对象
  * @Project: LangChain4j-Code-Platform
  * @Date: 2026/3/16
  */

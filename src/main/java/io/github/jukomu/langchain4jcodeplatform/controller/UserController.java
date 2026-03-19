@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import static io.github.jukomu.langchain4jcodeplatform.constant.UserConstant.ADMIN_ROLE;
+import static io.github.jukomu.langchain4jcodeplatform.constant.UserConstant.DEFAULT_ROLE;
 
 /**
  * 用户 控制层。
@@ -53,6 +54,7 @@ public class UserController {
      * 获取当前登录用户
      */
     @GetMapping("/get/login")
+    @AuthCheck(hasRole = DEFAULT_ROLE)
     public BaseResponse<LoginUserVo> getLoginUser(HttpServletRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
         LoginUserVo loginUser = userService.getLoginUser(request);
@@ -63,6 +65,7 @@ public class UserController {
      * 用户注销
      */
     @GetMapping("/logout")
+    @AuthCheck(hasRole = DEFAULT_ROLE)
     public BaseResponse<Boolean> logout(HttpServletRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
         boolean logout = userService.logout(request);
@@ -115,6 +118,7 @@ public class UserController {
      * @return
      */
     @DeleteMapping
+    @AuthCheck(hasRole = ADMIN_ROLE)
     public BaseResponse<Boolean> deleteUser(@RequestBody DeleteRequest deleteRequest) {
         ThrowUtils.throwIf(deleteRequest == null || deleteRequest.getId() == null, ErrorCode.PARAMS_ERROR);
         boolean deleted = userService.deleteUser(deleteRequest);

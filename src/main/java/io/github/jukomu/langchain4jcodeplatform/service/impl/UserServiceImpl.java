@@ -16,6 +16,7 @@ import io.github.jukomu.langchain4jcodeplatform.model.vo.UserVo;
 import io.github.jukomu.langchain4jcodeplatform.service.UserService;
 import io.github.jukomu.langchain4jcodeplatform.util.ThrowUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
@@ -82,7 +83,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public LoginUserVo getLoginUser(HttpServletRequest request) {
+    public @NotNull LoginUserVo getLoginUser(HttpServletRequest request) {
         Object attribute = request.getSession().getAttribute(USER_LOGIN_STATE);
         LoginUserVo loginUserVo = (LoginUserVo) attribute;
         ThrowUtils.throwIf(loginUserVo == null || loginUserVo.getId() == null, ErrorCode.NOT_LOGIN_ERROR);
@@ -99,7 +100,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public UserVo getUser(long id) {
+    public @NotNull UserVo getUser(long id) {
         User user = this.getById(id);
         ThrowUtils.throwIf(user == null, ErrorCode.NOT_FOUND_ERROR);
         UserVo userVo = new UserVo();
