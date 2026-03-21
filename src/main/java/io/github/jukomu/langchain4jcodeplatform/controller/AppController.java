@@ -1,5 +1,7 @@
 package io.github.jukomu.langchain4jcodeplatform.controller;
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import io.github.jukomu.langchain4jcodeplatform.annotation.AuthCheck;
 import io.github.jukomu.langchain4jcodeplatform.common.BaseResponse;
@@ -14,7 +16,13 @@ import io.github.jukomu.langchain4jcodeplatform.util.ResultUtils;
 import io.github.jukomu.langchain4jcodeplatform.util.ThrowUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.Map;
 
 import static io.github.jukomu.langchain4jcodeplatform.constant.UserConstant.ADMIN_ROLE;
 import static io.github.jukomu.langchain4jcodeplatform.constant.UserConstant.DEFAULT_ROLE;
@@ -145,5 +153,35 @@ public class AppController {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         AppVo appVo = appService.getApp(id);
         return ResultUtils.success(appVo);
+    }
+
+    /**
+     * 应用聊天生成代码
+     *
+     * @param appId       应用 id
+     * @param userMessage 用户消息
+     * @return 生成结果流
+     */
+    @GetMapping(value = "/chat/{appId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @AuthCheck(hasRole = DEFAULT_ROLE)
+    public Flux<ServerSentEvent<String>> chatTogGenCode(@PathVariable Long appId, @RequestParam String userMessage) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
+        ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        Flux<String> content = appService.chatToGenCode(appId, userMessage);
+        // 转换为 ServerSentEvent
+        return content.map(chunk -> {
+                    // 包装为 JSON
+                    String jsonData = JSONUtil.toJsonStr(Map.of("v", chunk));
+                    return ServerSentEvent.<String>builder()
+                            .data(jsonData)
+                            .build();
+                })
+                .concatWith(Mono.just(
+                        // 结束事件
+                        ServerSentEvent.<String>builder()
+                                .event("done")
+                                .data("finish")
+                                .build()
+                ));
     }
 }

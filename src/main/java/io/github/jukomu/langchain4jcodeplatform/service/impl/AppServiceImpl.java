@@ -1,10 +1,14 @@
 package io.github.jukomu.langchain4jcodeplatform.service.impl;
 
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import io.github.jukomu.langchain4jcodeplatform.common.DeleteRequest;
+import io.github.jukomu.langchain4jcodeplatform.constant.AppConstant;
+import io.github.jukomu.langchain4jcodeplatform.core.AiCodeGeneratorFacade;
 import io.github.jukomu.langchain4jcodeplatform.exception.BusinessException;
 import io.github.jukomu.langchain4jcodeplatform.exception.ErrorCode;
 import io.github.jukomu.langchain4jcodeplatform.mapper.AppMapper;
@@ -13,14 +17,18 @@ import io.github.jukomu.langchain4jcodeplatform.model.entity.App;
 import io.github.jukomu.langchain4jcodeplatform.model.entity.User;
 import io.github.jukomu.langchain4jcodeplatform.model.enums.CodeGenTypeEnum;
 import io.github.jukomu.langchain4jcodeplatform.model.vo.AppVo;
+import io.github.jukomu.langchain4jcodeplatform.model.vo.LoginUserVo;
 import io.github.jukomu.langchain4jcodeplatform.model.vo.UserVo;
 import io.github.jukomu.langchain4jcodeplatform.service.AppService;
 import io.github.jukomu.langchain4jcodeplatform.service.UserService;
 import io.github.jukomu.langchain4jcodeplatform.util.ThrowUtils;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
+import java.io.File;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -29,19 +37,17 @@ import static io.github.jukomu.langchain4jcodeplatform.constant.AppConstant.DEFA
 import static io.github.jukomu.langchain4jcodeplatform.constant.AppConstant.FEATURED_APP_PRIORITY;
 
 /**
- * 搴旂敤 鏈嶅姟灞傚疄鐜般€? *
+ * 应用 服务层实现。
  *
  * @author JUKOMU
  */
 @Service
+@RequiredArgsConstructor
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
 
     private static final int USER_MAX_PAGE_SIZE = 20;
     private final UserService userService;
-
-    public AppServiceImpl(UserService userService) {
-        this.userService = userService;
-    }
+    private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
 
     @Override
     public long addApp(AppAddDto appAddDto, Long userId) {
@@ -185,6 +191,66 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(pageNum <= 0 || pageSize <= 0, ErrorCode.PARAMS_ERROR, "分页参数错误");
         Page<App> appPage = this.page(Page.of(pageNum, pageSize), getAdminQueryWrapper(appAdminQueryDto));
         return buildAppVoPage(appPage, pageNum, pageSize);
+    }
+
+    @Override
+    public Flux<String> chatToGenCode(Long appId, String userMessage) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        // 查询应用信息
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        // 验证用户是否有权限访问该应用，仅本人可以生成代码
+        if (!app.getUserId().equals(userService.getLoginUser().getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
+        }
+        // 获取应用的代码生成类型
+        String codeGenTypeStr = app.getCodeGenType();
+        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenTypeStr);
+        ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
+        // 调用 AI 生成代码
+        return aiCodeGeneratorFacade.streamGenerateAndSaveCode(userMessage, codeGenTypeEnum, appId);
+    }
+
+    @Override
+    public String deployApp(Long appId) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        LoginUserVo loginUser = userService.getLoginUser();
+        // 查询应用信息
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        // 校验权限
+        if (!app.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限部署该应用");
+        }
+        // 校验 deployKey
+        String deployKey = app.getDeployKey();
+        if (StrUtil.isBlank(deployKey)) {
+            // 生成6位key(大小写字母+数字)
+            deployKey = RandomUtil.randomString(6);
+        }
+        // 构建源目录路径
+        String codeGenType = app.getCodeGenType();
+        String sourceDirName = codeGenType + "_" + appId;
+        String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
+        // 验证源目录是否存在
+        File sourceDir = new File(sourceDirPath);
+        if (!sourceDir.exists() || !sourceDir.isDirectory()) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用代码不存在，请先生成代码");
+        }
+        // 复制文件到部署目录
+        String deployDirPath = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
+        try {
+            FileUtil.copyContent(sourceDir, new File(deployDirPath), true);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署失败: " + e.getMessage());
+        }
+        // 更新应用 deployKey 和部署时间
+        app.setDeployKey(deployKey);
+        app.setDeployedTime(LocalDateTime.now());
+        boolean updated = this.updateById(app);
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
+        return String.format("%s/%s/", AppConstant.CODE_DEPLOY_HOST, deployKey);
     }
 
     private void validateAppAddDto(AppAddDto appAddDto) {

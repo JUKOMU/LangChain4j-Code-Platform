@@ -1,5 +1,7 @@
 package io.github.jukomu.langchain4jcodeplatform;
 
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.RandomUtil;
 import io.github.jukomu.langchain4jcodeplatform.core.AiCodeGeneratorFacade;
 import io.github.jukomu.langchain4jcodeplatform.model.enums.CodeGenTypeEnum;
 import org.junit.jupiter.api.Assertions;
@@ -24,13 +26,13 @@ public class AiCodeGeneratorFacadeTest {
 
     @Test
     public void generateAndSaveCode() {
-        File file = aiCodeGeneratorFacade.generateAndSaveCode("任务记录网站", CodeGenTypeEnum.MULTI_FILE);
+        File file = aiCodeGeneratorFacade.generateAndSaveCode("任务记录网站", CodeGenTypeEnum.MULTI_FILE, RandomUtil.randomLong());
         Assertions.assertNotNull(file);
     }
 
     @Test
     public void streamGenerateAndSaveCode() {
-        Flux<String> stream = aiCodeGeneratorFacade.streamGenerateAndSaveCode("任务记录网站", CodeGenTypeEnum.MULTI_FILE);
+        Flux<String> stream = aiCodeGeneratorFacade.streamGenerateAndSaveCode("任务记录网站", CodeGenTypeEnum.MULTI_FILE, RandomUtil.randomLong());
         // 阻塞
         stream.doOnNext(chunk -> System.out.print(chunk))
                 .blockLast();

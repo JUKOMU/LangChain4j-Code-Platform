@@ -20,6 +20,9 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 
@@ -88,6 +91,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         LoginUserVo loginUserVo = (LoginUserVo) attribute;
         ThrowUtils.throwIf(loginUserVo == null || loginUserVo.getId() == null, ErrorCode.NOT_LOGIN_ERROR);
         return loginUserVo;
+    }
+
+    @Override
+    public LoginUserVo getLoginUser() {
+        RequestAttributes requestAttributes = RequestContextHolder.currentRequestAttributes();
+        HttpServletRequest request = ((ServletRequestAttributes) requestAttributes).getRequest();
+        return getLoginUser(request);
     }
 
     @Override

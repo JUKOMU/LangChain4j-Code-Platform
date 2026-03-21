@@ -7,6 +7,7 @@ import io.github.jukomu.langchain4jcodeplatform.model.dto.app.*;
 import io.github.jukomu.langchain4jcodeplatform.model.entity.App;
 import io.github.jukomu.langchain4jcodeplatform.model.vo.AppVo;
 import jakarta.validation.constraints.NotNull;
+import reactor.core.publisher.Flux;
 
 /**
  * APP 服务层。
@@ -100,4 +101,21 @@ public interface AppService extends IService<App> {
      * @return
      */
     Page<AppVo> getApps(AppAdminQueryDto appAdminQueryDto);
+
+    /**
+     * 生成应用代码
+     *
+     * @param appId
+     * @param userMessage
+     * @return
+     */
+    Flux<String> chatToGenCode(Long appId, String userMessage);
+
+    /**
+     * 部署应用
+     *
+     * @param appId
+     * @return
+     */
+    String deployApp(Long appId);
 }
