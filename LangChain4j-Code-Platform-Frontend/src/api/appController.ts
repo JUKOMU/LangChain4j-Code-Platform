@@ -94,6 +94,18 @@ export async function chatTogGenCode(
   })
 }
 
+/** 此处后端没有提供注释 POST /app/deploy */
+export async function deployApp(body: API.AppDeployDto, options?: { [key: string]: any }) {
+  return request<API.BaseResponseString>('/app/deploy', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
 /** 此处后端没有提供注释 POST /app/good/list */
 export async function getFeaturedApps(body: API.AppQueryDto, options?: { [key: string]: any }) {
   return request<API.BaseResponsePageAppVo>('/app/good/list', {

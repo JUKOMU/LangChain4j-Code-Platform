@@ -28,6 +28,10 @@ declare namespace API {
     priority?: number
   }
 
+  type AppDeployDto = {
+    appId?: number
+  }
+
   type AppQueryDto = {
     pageNum?: number
     pageSize?: number

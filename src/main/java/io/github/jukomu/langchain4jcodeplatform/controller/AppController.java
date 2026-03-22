@@ -184,4 +184,22 @@ public class AppController {
                                 .build()
                 ));
     }
+
+    /**
+     * 应用部署
+     *
+     * @param appDeployDto 部署请求
+     * @param appDeployDto 请求
+     * @return 部署 URL
+     */
+    @PostMapping("/deploy")
+    public BaseResponse<String> deployApp(@RequestBody AppDeployDto appDeployDto) {
+        ThrowUtils.throwIf(appDeployDto == null, ErrorCode.PARAMS_ERROR);
+        Long appId = appDeployDto.getAppId();
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        // 调用服务部署应用
+        String deployUrl = appService.deployApp(appId);
+        return ResultUtils.success(deployUrl);
+    }
+
 }
