@@ -1,6 +1,7 @@
 package io.github.jukomu.langchain4jcodeplatform.core;
 
 import io.github.jukomu.langchain4jcodeplatform.ai.AiCodeGeneratorService;
+import io.github.jukomu.langchain4jcodeplatform.ai.AiCodeGeneratorServiceFactory;
 import io.github.jukomu.langchain4jcodeplatform.ai.model.HtmlCodeResult;
 import io.github.jukomu.langchain4jcodeplatform.ai.model.MultiFileCodeResult;
 import io.github.jukomu.langchain4jcodeplatform.exception.BusinessException;
@@ -27,7 +28,7 @@ import java.io.File;
 @RequiredArgsConstructor
 public class AiCodeGeneratorFacade {
 
-    private final AiCodeGeneratorService aiCodeGeneratorService;
+    private final AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
     /**
      * 根据类型生成并保存代码
@@ -38,6 +39,7 @@ public class AiCodeGeneratorFacade {
      */
     public File generateAndSaveCode(String userMessage, CodeGenTypeEnum codeGenTypeEnum, Long appId) {
         ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.SYSTEM_ERROR, "生成类型不能为空");
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId);
         return switch (codeGenTypeEnum) {
             case HTML -> {
                 HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode(userMessage);
@@ -63,6 +65,7 @@ public class AiCodeGeneratorFacade {
      */
     public Flux<String> streamGenerateAndSaveCode(String userMessage, CodeGenTypeEnum codeGenTypeEnum, Long appId) {
         ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.SYSTEM_ERROR, "生成类型不能为空");
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId);
         return switch (codeGenTypeEnum) {
             case HTML -> {
                 Flux<String> codeStream = aiCodeGeneratorService.streamGenerateHtmlCode(userMessage);

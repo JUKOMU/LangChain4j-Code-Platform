@@ -5,6 +5,9 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import io.github.jukomu.langchain4jcodeplatform.exception.BusinessException;
 import io.github.jukomu.langchain4jcodeplatform.exception.ErrorCode;
 import io.github.jukomu.langchain4jcodeplatform.mapper.AppMapper;
@@ -21,6 +24,7 @@ import io.github.jukomu.langchain4jcodeplatform.service.ChatHistoryService;
 import io.github.jukomu.langchain4jcodeplatform.service.UserService;
 import io.github.jukomu.langchain4jcodeplatform.util.ThrowUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +37,7 @@ import java.util.stream.Collectors;
  *
  * @author JUKOMU
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatHistory> implements ChatHistoryService {
@@ -133,6 +138,41 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
             return true;
         }
         return this.remove(queryWrapper);
+    }
+
+    @Override
+    public int loadChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxCount) {
+        try {
+            // 从 1 开始排除用户最新的消息
+            QueryWrapper queryWrapper = QueryWrapper.create()
+                    .eq(ChatHistory::getAppId, appId)
+                    .orderBy(ChatHistory::getCreateTime, false)
+                    .limit(1, maxCount);
+            List<ChatHistory> list = this.list(queryWrapper);
+            if (list.isEmpty()) {
+                return 0;
+            }
+            // 反转列表，使旧的消息在前
+            list = list.reversed();
+            // 按时间顺序添加到记忆中
+            int loadedCount = 0;
+            chatMemory.clear();
+            for (ChatHistory chatHistory : list) {
+                if (ChatHistoryMessageTypeEnum.USER.getValue().equals(chatHistory.getMessageType())) {
+                    chatMemory.add(UserMessage.from(chatHistory.getMessage()));
+                    loadedCount += 1;
+                }
+                if (ChatHistoryMessageTypeEnum.AI.getValue().equals(chatHistory.getMessageType())) {
+                    chatMemory.add(AiMessage.from(chatHistory.getMessage()));
+                    loadedCount += 1;
+                }
+            }
+            log.info("成功为 appId: {} 加载了 {} 条历史对话", appId, loadedCount);
+            return loadedCount;
+        } catch (Exception e) {
+            log.error("加载历史对话失败, appId: {}, error: {}", appId, e.getMessage(), e);
+            return 0;
+        }
     }
 
     private QueryWrapper getAdminQueryWrapper(ChatHistoryQueryDto chatHistoryQueryDto) {

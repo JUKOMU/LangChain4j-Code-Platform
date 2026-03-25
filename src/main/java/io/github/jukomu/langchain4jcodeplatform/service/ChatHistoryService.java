@@ -2,6 +2,7 @@ package io.github.jukomu.langchain4jcodeplatform.service;
 
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.service.IService;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import io.github.jukomu.langchain4jcodeplatform.model.dto.chatHistory.AppChatHistoryQueryDto;
 import io.github.jukomu.langchain4jcodeplatform.model.dto.chatHistory.ChatHistoryQueryDto;
 import io.github.jukomu.langchain4jcodeplatform.model.entity.ChatHistory;
@@ -61,4 +62,14 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * @return
      */
     boolean deleteByAppId(Long appId);
+
+    /**
+     * 加载对话历史到对话记忆中
+     *
+     * @param appId
+     * @param chatMemory
+     * @param maxCount
+     * @return 加载的对话数量
+     */
+    int loadChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxCount);
 }
