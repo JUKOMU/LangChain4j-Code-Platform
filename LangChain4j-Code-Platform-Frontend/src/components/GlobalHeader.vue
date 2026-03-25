@@ -1,16 +1,17 @@
 <template>
   <a-layout-header class="header">
-    <a-row :wrap="false">
-      <!-- 左侧：Logo和标题 -->
-      <a-col flex="200px">
-        <RouterLink to="/">
+    <a-row :wrap="false" align="middle">
+      <a-col flex="320px">
+        <RouterLink to="/" class="brand-link">
           <div class="header-left">
             <img class="logo" src="@/assets/logo.png" alt="Logo" />
-            <h1 class="site-title">AI应用生成</h1>
+            <div>
+              <h1 class="site-title">AI 应用生成平台</h1>
+              <p class="site-subtitle">对话式创建网站与应用</p>
+            </div>
           </div>
         </RouterLink>
       </a-col>
-      <!-- 中间：导航菜单 -->
       <a-col flex="auto">
         <a-menu
           v-model:selectedKeys="selectedKeys"
@@ -19,14 +20,13 @@
           @click="handleMenuClick"
         />
       </a-col>
-      <!-- 右侧：用户操作区域 -->
       <a-col>
         <div class="user-login-status">
           <div v-if="loginUserStore.loginUser.id">
             <a-dropdown>
               <a-space>
                 <a-avatar :src="loginUserStore.loginUser.userAvatar" />
-                {{ loginUserStore.loginUser.userName ?? '无名' }}
+                {{ loginUserStore.loginUser.userName ?? '无名用户' }}
               </a-space>
               <template #overlay>
                 <a-menu>
@@ -48,48 +48,47 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { type MenuProps, message } from 'ant-design-vue'
-import { useLoginUserStore } from '@/stores/loginUser.ts'
-import { HomeOutlined, LogoutOutlined } from '@ant-design/icons-vue'
-import { logout } from '@/api/userController.ts'
-import ACCESS_ENUM from '@/access/accessEnum.ts'
-import checkAccess from '@/access/checkAccess.ts'
+import { AppstoreOutlined, HomeOutlined, LogoutOutlined, TeamOutlined } from '@ant-design/icons-vue'
+import { useLoginUserStore } from '@/stores/loginUser'
+import { logout } from '@/api/userController'
+import ACCESS_ENUM from '@/access/accessEnum'
+import checkAccess from '@/access/checkAccess'
 
-// 用户注销
 const handleLogout = async () => {
   const res = await logout()
   if (res.data.code === 200) {
     loginUserStore.setLoginUser({
       userName: '未登录',
+      userRole: ACCESS_ENUM.NOT_LOGIN,
     })
     message.success('退出登录成功')
     await router.push('/user/login')
   } else {
-    message.error('退出登录失败，' + res.data.message)
+    message.error(`退出登录失败，${res.data.message}`)
   }
 }
 
 const loginUserStore = useLoginUserStore()
 const router = useRouter()
-// 当前选中菜单
 const selectedKeys = ref<string[]>(['/'])
-// 监听路由变化，更新当前选中菜单
-router.afterEach((to, from, next) => {
+
+router.afterEach((to) => {
   selectedKeys.value = [to.path]
 })
 
-// 菜单配置项
 const originMenuItems = [
   {
     key: '/',
     icon: () => h(HomeOutlined),
-    label: '主页',
-    title: '主页',
+    label: '首页',
+    title: '首页',
   },
   {
     key: '/admin/userManage',
+    icon: () => h(TeamOutlined),
     label: '用户管理',
     title: '用户管理',
     meta: {
@@ -97,68 +96,86 @@ const originMenuItems = [
     },
   },
   {
-    key: '/about',
-    label: '关于',
-    title: '关于我们',
-  },
-  {
-    key: 'others',
-    label: h('a', { href: 'https://www.codefather.cn', target: '_blank' }, '编程导航'),
-    title: '编程导航',
+    key: '/admin/appManage',
+    icon: () => h(AppstoreOutlined),
+    label: '应用管理',
+    title: '应用管理',
     meta: {
-      hidden: true,
+      access: ACCESS_ENUM.ADMIN,
     },
   },
 ]
 
-// 过滤菜单项
-const filterMenus = (menus = [] as any[]) => {
-  return menus?.filter((menu) => {
-    if (menu?.meta?.hidden) {
-      return false
-    }
-    return checkAccess(loginUserStore.loginUser, menu?.meta?.access as string)
-  })
-}
+const filterMenus = (menus = [] as typeof originMenuItems) =>
+  menus.filter((menu) => checkAccess(loginUserStore.loginUser, menu?.meta?.access as string))
 
-// 展示在菜单的路由数组
 const menuItems = computed<MenuProps['items']>(() => filterMenus(originMenuItems))
 
-// 处理菜单点击
-const handleMenuClick: MenuProps['onClick'] = (e) => {
-  const key = e.key as string
+const handleMenuClick: MenuProps['onClick'] = (event) => {
+  const key = event.key as string
   selectedKeys.value = [key]
-  // 跳转到对应页面
   if (key.startsWith('/')) {
     router.push(key)
   }
 }
+
+onMounted(() => {
+  if (!loginUserStore.loginUser.id) {
+    loginUserStore.fetchLoginUser()
+  }
+})
 </script>
 
 <style scoped>
 .header {
-  background: #fff;
-  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: auto;
+  line-height: normal;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  padding: 10px 24px;
+  border-bottom: 1px solid rgba(16, 38, 58, 0.06);
+}
+
+.brand-link {
+  display: block;
+}
+
+.header :deep(.ant-row) {
+  min-height: 44px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .logo {
-  height: 48px;
-  width: 48px;
+  height: 24px;
+  width: 24px;
+  flex: 0 0 auto;
 }
 
 .site-title {
   margin: 0;
   font-size: 18px;
-  color: #1890ff;
+  line-height: 1.2;
+  color: #15344d;
+}
+
+.site-subtitle {
+  margin: 2px 0 0;
+  color: #75879a;
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .ant-menu-horizontal {
   border-bottom: none !important;
+  background: transparent;
 }
 </style>

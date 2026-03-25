@@ -22,14 +22,14 @@ declare namespace API {
   }
 
   type AppAdminUpdateDto = {
-    id?: number
+    id?: number | string
     appName?: string
     cover?: string
     priority?: number
   }
 
   type AppDeployDto = {
-    appId?: number
+    appId?: number | string
   }
 
   type AppQueryDto = {
@@ -48,12 +48,12 @@ declare namespace API {
   }
 
   type AppUpdateDto = {
-    id?: number
+    id?: number | string
     appName?: string
   }
 
   type AppVo = {
-    id?: number
+    id?: number | string
     appName?: string
     cover?: string
     initPrompt?: string
@@ -61,7 +61,7 @@ declare namespace API {
     deployKey?: string
     deployedTime?: string
     priority?: number
-    userId?: number
+    userId?: number | string
     editTime?: string
     createTime?: string
     updateTime?: string
@@ -88,7 +88,7 @@ declare namespace API {
 
   type BaseResponseLong = {
     code?: number
-    data?: number
+    data?: number | string
     message?: string
   }
 
@@ -117,28 +117,28 @@ declare namespace API {
   }
 
   type chatTogGenCodeParams = {
-    appId: number
+    appId: number | string
     userMessage: string
   }
 
   type DeleteRequest = {
-    id?: number
+    id?: number | string
   }
 
   type getAppByAdminParams = {
-    id: number
+    id: number | string
   }
 
   type getAppParams = {
-    id: number
+    id: number | string
   }
 
   type getUserParams = {
-    id: number
+    id: number | string
   }
 
   type LoginUserVo = {
-    id?: number
+    id?: number | string
     userAccount?: string
     userName?: string
     userAvatar?: string
@@ -186,7 +186,7 @@ declare namespace API {
     pageSize?: number
     sortField?: string
     sortOrder?: string
-    id?: number
+    id?: number | string
     userName?: string
     userAccount?: string
     userProfile?: string
@@ -200,7 +200,7 @@ declare namespace API {
   }
 
   type UserUpdateDto = {
-    id?: number
+    id?: number | string
     userName?: string
     userAvatar?: string
     userProfile?: string
@@ -208,7 +208,7 @@ declare namespace API {
   }
 
   type UserVo = {
-    id?: number
+    id?: number | string
     userAccount?: string
     userName?: string
     userAvatar?: string

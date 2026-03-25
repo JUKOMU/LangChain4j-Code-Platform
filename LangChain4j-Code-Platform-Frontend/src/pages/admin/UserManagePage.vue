@@ -88,11 +88,11 @@ const doSearch = () => {
 }
 
 // 删除数据
-const doDelete = async (id: string) => {
+const doDelete = async (id?: string | number) => {
   if (!id) {
     return
   }
-  const res = await deleteUser({ id: Number(id) })
+  const res = await deleteUser({ id: String(id) })
   if (res.data.code === 200) {
     message.success('删除成功')
     // 刷新数据
