@@ -1,5 +1,6 @@
 package io.github.jukomu.langchain4jcodeplatform.service.impl;
 
+import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
@@ -15,17 +16,21 @@ import io.github.jukomu.langchain4jcodeplatform.mapper.AppMapper;
 import io.github.jukomu.langchain4jcodeplatform.model.dto.app.*;
 import io.github.jukomu.langchain4jcodeplatform.model.entity.App;
 import io.github.jukomu.langchain4jcodeplatform.model.entity.User;
+import io.github.jukomu.langchain4jcodeplatform.model.enums.ChatHistoryMessageTypeEnum;
 import io.github.jukomu.langchain4jcodeplatform.model.enums.CodeGenTypeEnum;
 import io.github.jukomu.langchain4jcodeplatform.model.vo.AppVo;
 import io.github.jukomu.langchain4jcodeplatform.model.vo.LoginUserVo;
 import io.github.jukomu.langchain4jcodeplatform.model.vo.UserVo;
 import io.github.jukomu.langchain4jcodeplatform.service.AppService;
+import io.github.jukomu.langchain4jcodeplatform.service.ChatHistoryService;
 import io.github.jukomu.langchain4jcodeplatform.service.UserService;
 import io.github.jukomu.langchain4jcodeplatform.util.ThrowUtils;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
@@ -37,10 +42,11 @@ import static io.github.jukomu.langchain4jcodeplatform.constant.AppConstant.DEFA
 import static io.github.jukomu.langchain4jcodeplatform.constant.AppConstant.FEATURED_APP_PRIORITY;
 
 /**
- * 应用 服务层实现。
+ * 应用 服务层实现
  *
  * @author JUKOMU
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
@@ -48,6 +54,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private static final int USER_MAX_PAGE_SIZE = 20;
     private final UserService userService;
     private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
+    private final ChatHistoryService chatHistoryService;
 
     @Override
     public long addApp(AppAddDto appAddDto, Long userId) {
@@ -89,6 +96,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean deleteMyApp(DeleteRequest deleteRequest, Long userId) {
         ThrowUtils.throwIf(deleteRequest == null || deleteRequest.getId() == null, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR);
@@ -97,6 +105,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
         // 仅本人可删除
         checkAppOwner(oldApp, userId);
+        // 先删除对话历史
+        try {
+            boolean historyDeleted = chatHistoryService.deleteByAppId(deleteRequest.getId());
+            if (!historyDeleted) {
+                log.error("应用id: {}, 删除应用对话历史失败", deleteRequest.getId());
+            }
+        } catch (Exception e) {
+            log.error("应用id: {}, 删除应用对话历史失败: {}", deleteRequest.getId(), e.getMessage());
+        }
         boolean removed = this.removeById(deleteRequest.getId());
         ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR);
         return true;
@@ -113,7 +130,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         // 组装用户信息
         AppVo appVo = getAppVo(app);
-        UserVo userVo = userService.getUser(userId);
+        UserVo userVo = userService.getUser(app.getUserId());
         appVo.setUser(userVo);
         return appVo;
     }
@@ -127,8 +144,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         validateUserPage(pageNum, pageSize);
         // 用户只能查询自己的应用
         appQueryDto.setUserId(userId);
-        QueryWrapper queryWrapper = getQueryWrapper(appQueryDto);
-        Page<App> appPage = this.page(Page.of(pageNum, pageSize), queryWrapper);
+        Page<App> appPage = this.page(Page.of(pageNum, pageSize), getQueryWrapper(appQueryDto));
         return buildAppVoPage(appPage, pageNum, pageSize);
     }
 
@@ -148,12 +164,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean deleteApp(DeleteRequest deleteRequest) {
         ThrowUtils.throwIf(deleteRequest == null || deleteRequest.getId() == null, ErrorCode.PARAMS_ERROR);
         App oldApp = this.getById(deleteRequest.getId());
         ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
         boolean removed = this.removeById(deleteRequest.getId());
         ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR);
+        boolean historyDeleted = chatHistoryService.deleteByAppId(deleteRequest.getId());
+        ThrowUtils.throwIf(!historyDeleted, ErrorCode.OPERATION_ERROR, "删除应用对话历史失败");
         return true;
     }
 
@@ -176,7 +195,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         App app = this.getById(id);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
-        // 组转用户信息
+        // 组装用户信息
         AppVo appVo = getAppVo(app);
         UserVo userVo = userService.getUser(app.getUserId());
         appVo.setUser(userVo);
@@ -197,19 +216,34 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     public Flux<String> chatToGenCode(Long appId, String userMessage) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(userMessage), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        LoginUserVo loginUser = userService.getLoginUser();
         // 查询应用信息
         App app = this.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
         // 验证用户是否有权限访问该应用，仅本人可以生成代码
-        if (!app.getUserId().equals(userService.getLoginUser().getId())) {
+        if (!app.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
         // 获取应用的代码生成类型
         String codeGenTypeStr = app.getCodeGenType();
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenTypeStr);
         ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
-        // 调用 AI 生成代码
-        return aiCodeGeneratorFacade.streamGenerateAndSaveCode(userMessage, codeGenTypeEnum, appId);
+        // 添加用户消息到对话历史
+        Long parentId = chatHistoryService.getLatestMessageId(appId);
+        long userMessageId = chatHistoryService.saveMessage(appId, loginUser.getId(), userMessage, ChatHistoryMessageTypeEnum.USER, parentId);
+        // 收集ai响应内容并在完成后记录到对话历史
+        StringBuilder aiReplyBuilder = new StringBuilder();
+        return aiCodeGeneratorFacade.streamGenerateAndSaveCode(userMessage, codeGenTypeEnum, appId)
+                .map(chunk -> {
+                    // 收集ai响应内容
+                    aiReplyBuilder.append(chunk);
+                    return chunk;
+                })
+                .doOnComplete(() -> chatHistoryService.saveMessage(appId, loginUser.getId(),
+                        aiReplyBuilder.toString(), ChatHistoryMessageTypeEnum.AI, userMessageId))
+                .doOnError(throwable -> chatHistoryService.saveMessage(appId, loginUser.getId(),
+                        "AI 回复失败: " + ExceptionUtil.getRootCauseMessage(throwable),
+                        ChatHistoryMessageTypeEnum.AI_ERROR, userMessageId));
     }
 
     @Override
@@ -229,9 +263,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             // 生成6位key(大小写字母+数字)
             deployKey = RandomUtil.randomString(6);
         }
-        // 构建源目录路径
-        String codeGenType = app.getCodeGenType();
-        String sourceDirName = codeGenType + "_" + appId;
+
+        String sourceDirName = app.getCodeGenType() + "_" + appId;
         String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
         // 验证源目录是否存在
         File sourceDir = new File(sourceDirPath);
@@ -254,6 +287,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     private void validateAppAddDto(AppAddDto appAddDto) {
+        ThrowUtils.throwIf(appAddDto == null, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(StrUtil.isBlank(appAddDto.getInitPrompt()), ErrorCode.PARAMS_ERROR, "initPrompt 不能为空");
         ThrowUtils.throwIf(appAddDto.getAppName() != null && appAddDto.getAppName().length() > 256, ErrorCode.PARAMS_ERROR, "应用名称过长");
         ThrowUtils.throwIf(appAddDto.getCover() != null && appAddDto.getCover().length() > 512, ErrorCode.PARAMS_ERROR, "应用封面过长");
@@ -261,6 +295,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     private void validateAppUpdateDto(AppUpdateDto appUpdateDto) {
+        ThrowUtils.throwIf(appUpdateDto == null, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(StrUtil.isBlank(appUpdateDto.getAppName()), ErrorCode.PARAMS_ERROR, "应用名称不能为空");
         ThrowUtils.throwIf(appUpdateDto.getAppName().length() > 256, ErrorCode.PARAMS_ERROR, "应用名称过长");
     }
@@ -362,7 +397,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         Map<Long, UserVo> userMap = userService.listByIds(userIds).stream()
                 .collect(Collectors.toMap(User::getId, item -> {
                     UserVo userVo = new UserVo();
-                    BeanUtils.copyProperties(item, UserVo.class);
+                    BeanUtils.copyProperties(item, userVo);
                     return userVo;
                 }));
         return userMap;
