@@ -189,7 +189,6 @@ public class AppController {
      * 应用部署
      *
      * @param appDeployDto 部署请求
-     * @param appDeployDto 请求
      * @return 部署 URL
      */
     @PostMapping("/deploy")
