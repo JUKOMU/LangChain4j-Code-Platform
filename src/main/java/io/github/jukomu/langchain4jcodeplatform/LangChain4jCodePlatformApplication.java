@@ -5,8 +5,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
-@SpringBootApplication
 @MapperScan("io.github.jukomu.langchain4jcodeplatform.mapper")
+@SpringBootApplication(exclude = {dev.langchain4j.community.store.embedding.redis.spring.RedisEmbeddingStoreAutoConfiguration.class})
 @EnableAspectJAutoProxy(proxyTargetClass = true)
 public class LangChain4jCodePlatformApplication {
 

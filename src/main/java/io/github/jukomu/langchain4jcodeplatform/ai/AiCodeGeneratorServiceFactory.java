@@ -7,6 +7,8 @@ import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.store.memory.chat.ChatMemoryStore;
+import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import io.github.jukomu.langchain4jcodeplatform.service.ChatHistoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +32,7 @@ public class AiCodeGeneratorServiceFactory {
 
     private final StreamingChatModel streamingChatModel;
 
-    private final RedisChatMemoryStore redisChatMemoryStore;
+    private final ChatMemoryStore redisChatMemoryStore;
 
     private final ChatHistoryService chatHistoryService;
 

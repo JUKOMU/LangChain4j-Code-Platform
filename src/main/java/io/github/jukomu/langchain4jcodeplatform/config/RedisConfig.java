@@ -1,6 +1,8 @@
 package io.github.jukomu.langchain4jcodeplatform.config;
 
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
+import dev.langchain4j.store.memory.chat.ChatMemoryStore;
+import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -19,16 +21,20 @@ public class RedisConfig {
 
     private String host;
     private Integer port;
-    private String password;
     private Long ttl;
 
     @Bean
-    public RedisChatMemoryStore redisChatMemoryStore() {
-        return RedisChatMemoryStore.builder()
-                .host(host)
-                .port(port)
-                .password(password)
-                .ttl(ttl)
-                .build();
+    public ChatMemoryStore redisChatMemoryStore() {
+         try {
+             RedisChatMemoryStore redisChatMemoryStore = RedisChatMemoryStore.builder()
+                     .host(host)
+                     .port(port)
+                     .ttl(ttl)
+                     .build();
+             return redisChatMemoryStore;
+         } catch (Exception e) {
+             InMemoryChatMemoryStore inMemoryChatMemoryStore = new InMemoryChatMemoryStore();
+             return inMemoryChatMemoryStore;
+         }
     }
 }
