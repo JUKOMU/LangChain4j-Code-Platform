@@ -1,6 +1,5 @@
 package io.github.jukomu.langchain4jcodeplatform.config;
 
-import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import dev.langchain4j.store.memory.chat.InMemoryChatMemoryStore;
 import lombok.Data;
@@ -25,16 +24,6 @@ public class RedisConfig {
 
     @Bean
     public ChatMemoryStore redisChatMemoryStore() {
-         try {
-             RedisChatMemoryStore redisChatMemoryStore = RedisChatMemoryStore.builder()
-                     .host(host)
-                     .port(port)
-                     .ttl(ttl)
-                     .build();
-             return redisChatMemoryStore;
-         } catch (Exception e) {
-             InMemoryChatMemoryStore inMemoryChatMemoryStore = new InMemoryChatMemoryStore();
-             return inMemoryChatMemoryStore;
-         }
+        return new InMemoryChatMemoryStore();
     }
 }

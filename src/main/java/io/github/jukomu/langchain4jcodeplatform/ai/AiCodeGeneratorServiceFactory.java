@@ -48,7 +48,8 @@ public class AiCodeGeneratorServiceFactory {
      * @return
      */
     public AiCodeGeneratorService getAiCodeGeneratorService(long appId) {
-        return aiCodeGeneratorServiceCache.get(appId, this::createAiCodeGeneratorService);
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceCache.get(appId, this::createAiCodeGeneratorService);
+        return aiCodeGeneratorService;
     }
 
     /**
