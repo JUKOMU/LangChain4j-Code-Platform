@@ -10,6 +10,7 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import io.github.jukomu.langchain4jcodeplatform.common.DeleteRequest;
 import io.github.jukomu.langchain4jcodeplatform.constant.AppConstant;
 import io.github.jukomu.langchain4jcodeplatform.core.AiCodeGeneratorFacade;
+import io.github.jukomu.langchain4jcodeplatform.core.handler.StreamHandlerExecutor;
 import io.github.jukomu.langchain4jcodeplatform.exception.BusinessException;
 import io.github.jukomu.langchain4jcodeplatform.exception.ErrorCode;
 import io.github.jukomu.langchain4jcodeplatform.mapper.AppMapper;
@@ -55,6 +56,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private final UserService userService;
     private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
     private final ChatHistoryService chatHistoryService;
+    private final StreamHandlerExecutor streamHandlerExecutor;
 
     @Override
     public long addApp(AppAddDto appAddDto, Long userId) {
@@ -232,18 +234,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         Long parentId = chatHistoryService.getLatestMessageId(appId);
         long userMessageId = chatHistoryService.saveMessage(appId, loginUser.getId(), userMessage, ChatHistoryMessageTypeEnum.USER, parentId);
         // 收集ai响应内容并在完成后记录到对话历史
-        StringBuilder aiReplyBuilder = new StringBuilder();
-        return aiCodeGeneratorFacade.streamGenerateAndSaveCode(userMessage, codeGenTypeEnum, appId)
-                .map(chunk -> {
-                    // 收集ai响应内容
-                    aiReplyBuilder.append(chunk);
-                    return chunk;
-                })
-                .doOnComplete(() -> chatHistoryService.saveMessage(appId, loginUser.getId(),
-                        aiReplyBuilder.toString(), ChatHistoryMessageTypeEnum.AI, userMessageId))
-                .doOnError(throwable -> chatHistoryService.saveMessage(appId, loginUser.getId(),
-                        "AI 回复失败: " + ExceptionUtil.getRootCauseMessage(throwable),
-                        ChatHistoryMessageTypeEnum.AI_ERROR, userMessageId));
+        User user = new User();
+        BeanUtils.copyProperties(loginUser, user);
+        return streamHandlerExecutor.doExecute(aiCodeGeneratorFacade.streamGenerateAndSaveCode(userMessage, codeGenTypeEnum, appId), chatHistoryService, appId, user, codeGenTypeEnum,userMessageId);
     }
 
     @Override
